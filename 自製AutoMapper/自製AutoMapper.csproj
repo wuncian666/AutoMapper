@@ -43,11 +43,29 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Children.cs" />
+    <Compile Include="Enums\ObjType.cs" />
+    <Compile Include="Enums\PropertyType.cs" />
+    <Compile Include="Enums\Sex.cs" />
+    <Compile Include="Extenstions\TypeExtension.cs" />
+    <Compile Include="MaperExpression.cs" />
+    <Compile Include="Mapper.cs" />
+    <Compile Include="mappers\AbstractMapper.cs" />
+    <Compile Include="mappers\ArrayMapper.cs" />
+    <Compile Include="mappers\BasicMapper.cs" />
+    <Compile Include="mappers\EnumToEnumMapper.cs" />
+    <Compile Include="mappers\MapperFactory.cs" />
+    <Compile Include="mappers\MultiObjectMapper.cs" />
+    <Compile Include="MappingConditions.cs" />
+    <Compile Include="Parent.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Student.cs" />
+    <Compile Include="User.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
