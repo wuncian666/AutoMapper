@@ -361,3 +361,29 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# 編譯輸出
+bin/
+obj/
+
+# Visual Studio 檔案
+*.sln.cache
+*.suo
+*.user
+.vs/
+*.csproj.user
+
+# NuGet 套件
+packages/
+*.nupkg
+
+# 日誌和臨時檔案
+*.log
+*.tmp
+
+# 測試相關
+TestResults/
+
+# 敏感資料（視情況）
+# appsettings.json
+# .env
