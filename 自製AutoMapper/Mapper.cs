@@ -1,148 +1,125 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using 自製AutoMapper.Enums;
 using 自製AutoMapper.mappers;
 
 namespace 自製AutoMapper
 {
     internal class Mapper
     {
-        //public static object Map(Type SourceType, Type TargetType)
-        //{
-        //}
-
         public static TTarget Map<TSource, TTarget>(
             TSource sourceData,
             Action<MaperExpression<TSource, TTarget>> action = null
-            ) where TTarget : new()
+            ) where TTarget : class, new()
         {
+            ValidateSource(sourceData);
+
             TTarget target = new TTarget();
             Type targetType = target.GetType();
 
-            var sourceProps = sourceData.GetType().GetProperties();
-
-            foreach (var prop in sourceProps)
+            if (action == null)
             {
-                var targetProp = targetType.GetProperty(prop.Name);
-                if (targetProp != null)
-                {
-                    var sourceType = prop.GetValue(sourceData).GetType();
-
-                    AbstractMapper<TSource, TTarget> mapper =
-                        MapperFactory.Create<TSource, TTarget>(
-                            sourceType.GetPropertyTypeEnum());
-
-                    mapper.AssignValue(sourceData, prop, targetType);
-
-                    /*if (sourceType.GetPropertyTypeEnum() == PropertyType.Basic)
-                    {
-                        targetProp.SetValue(target, prop.GetValue(sourceData));
-                    }
-                    else if (sourceType.IsArray)
-                    {
-                        Type targetElementType = targetProp.PropertyType.GetElementType();
-                        Array souceArray = (Array)prop.GetValue(sourceData);
-                        Array targetArray = Array.CreateInstance(targetElementType, souceArray.Length);
-
-                        MethodInfo findMapMethod = typeof(Mapper).GetMethod("Map");
-                        MethodInfo mapMethod = findMapMethod.MakeGenericMethod(
-                            sourceType.GetElementType(), targetElementType);
-                        for (int i = 0; i < souceArray.Length; i++)
-                        {
-                            object temp = mapMethod.Invoke(
-                                null, new object[] { souceArray.GetValue(i), null });
-                            targetArray.SetValue(temp, i);
-                        }
-                        targetProp.SetValue(target, targetArray);
-                    }
-                    else if (sourceType.GetPropertyTypeEnum() == PropertyType.Enum)
-                    {
-                        // source 一定是 enum
-                        // int, string
-                        if (targetProp.PropertyType == typeof(string))
-                        {
-                            targetProp.SetValue(target, prop.GetValue(sourceData).ToString());
-                        }
-                        else if (targetProp.PropertyType == typeof(int))
-                        {
-                            //var enumToInt = Convert.ToInt32(prop.GetValue(sourceData));
-                            var enumToInt = (int)(prop.GetValue(sourceData));
-                            targetProp.SetValue(target, enumToInt);
-                        }
-                    }
-                    else if (sourceType.IsClass && (sourceType.Name != "String"))
-                    {
-                        // stu -> parent, child
-                        MethodInfo findMapMethod = typeof(Mapper).GetMethod("Map");
-                        MethodInfo mapMethod = findMapMethod.MakeGenericMethod(prop.PropertyType, targetProp.PropertyType);
-                        object temp = mapMethod.Invoke(null, new object[] { prop.GetValue(sourceData), null });
-
-                        targetProp.SetValue(target, temp);
-                    }
-                    */
-                }
+                MapDefaultPropertis(sourceData, target, targetType);
+            }
+            else
+            {
+                MapCustomConditions(sourceData, target, targetType, action);
             }
 
-            if (action == null)
-                return target;
+            return target;
+        }
 
-            MaperExpression<TSource, TTarget> expression = new MaperExpression<TSource, TTarget>();
-            action.Invoke(expression);
+        private static void ValidateSource<TSource>(TSource sourceData)
+        {
+            if (sourceData == null)
+                throw new ArgumentNullException(nameof(sourceData));
+        }
 
-            Dictionary<string, MappingConditions> conditionMapping = expression.Build();
+        private static void MapDefaultPropertis<TSource, TTarger>(
+            TSource sourceData, TTarger target, Type targetType)
+            where TTarger : class, new()
+        {
+            var sourceProps = sourceData.GetType().GetProperties();
+            foreach (var item in sourceProps)
+            {
+                var targetProp = targetType.GetProperty(item.Name);
+                if (IsValidTargetProperty(targetProp))
+                {
+                    MapProperty(sourceData, target, item, targetProp);
+                }
+            }
+        }
+
+        private static void MapCustomConditions<TSource, TTarget>(
+            TSource sourceData, TTarget target, Type targetType, Action<MaperExpression<TSource, TTarget>> action)
+        {
+            var expression = new MaperExpression<TSource, TTarget>();
+            action(expression);
+            var conditionMapping = expression.Build();
 
             foreach (var condition in conditionMapping)
             {
-                var type = condition.Value.ObjType;
-                switch (type)
+                ProcessCondition(sourceData, target, targetType, condition);
+            }
+        }
+
+        private static bool IsValidTargetProperty(PropertyInfo targetProp)
+        {
+            return targetProp != null && targetProp.CanWrite;
+        }
+
+        private static void MapProperty<TSource, TTarget>(
+            TSource sourceData,
+            TTarget target,
+            PropertyInfo sourceProp,
+            PropertyInfo targetProp)
+            where TTarget : class, new()
+        {
+            try
+            {
+                var mapper = MapperFactory.Create<TSource, TTarget>(
+                    sourceProp.PropertyType.GetPropertyTypeEnum());
+                if (mapper != null)
                 {
-                    // key 是 target 的類別名稱，conditions 裏頭是 source 類別名稱，條件
-                    case ObjType.IS_MEMBER:
-                        ConditionIsMember(sourceData, targetType, target, condition);
-                        break;
-
-                    case ObjType.IS_VALUE:
-                        ConditionIsValue(targetType, target, condition);
-                        break;
-
-                    case ObjType.IS_COMBINATION:
-                        ConditionIsCombination(targetType, target, condition);
-                        break;
+                    mapper.AssignValue(sourceData, sourceProp, targetProp.DeclaringType);
+                }
+                else if (targetProp.PropertyType == sourceProp.PropertyType)
+                {
+                    targetProp.SetValue(target, sourceProp.GetValue(sourceData));
                 }
             }
+            catch (Exception)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot map source filed '{sourceProp.Name}' to target field '{targetProp.Name}'.");
+            }
+        }
 
-            //Dictionary<string, string> map = new Dictionary<string, string>();
+        private static void ProcessCondition<TSource, TTarget>(
+            TSource sourceData, TTarget target, Type targetType, KeyValuePair<string, MappingConditions> condition)
+        {
+            if (condition.Value == null)
+            {
+                throw new InvalidOperationException($"Cannot map source filed '{condition.Key}' to target field.");
+            }
+            var type = condition.Value.ObjType;
+            switch (type)
+            {
+                case ObjType.IS_MEMBER:
+                    ConditionIsMember(sourceData, targetType, target, condition);
+                    break;
 
-            //var dataBody = (MemberExpression)source.Body;
-            //string dMemName = dataBody.Member.Name;// User
-            //var targetBody = (MemberExpression)target.Body;
-            //string tMemName = targetBody.Member.Name;// Stu
+                case ObjType.IS_VALUE:
+                    ConditionIsValue(targetType, target, condition);
+                    break;
 
-            //map.Add(dMemName, tMemName);
+                case ObjType.IS_COMBINATION:
+                    ConditionIsCombination(targetType, target, condition);
+                    break;
 
-            //// 3. map
-            //tType
-            //    //value
-            //    .GetProperty(tMemName)
-            //    // key
-            //    .SetValue(t, data.GetType().GetProperty(dMemName).GetValue(data));
-
-            //Expression為父類別可以回傳整個Func的Expression:x => x.Name
-            //子類別:
-            //BinaryExpression => (x.Name == "Leo") => 樹狀結構(left,right)
-            //MemberExpression => x.Name
-            //ConstantExpression=> "Leo"
-            //MethodCallExpression =>x.Name.Contains("Leo")
-
-            Func<object, object> func = Map;
-            object obj = func.Invoke("AA");
-
-            return target;
+                default:
+                    throw new InvalidOperationException($"Cannot map source filed '{condition.Key}' to target field.");
+            }
         }
 
         private static void ConditionIsMember<TSource, TTarget>(
@@ -151,15 +128,16 @@ namespace 自製AutoMapper
             TTarget target,
             KeyValuePair<string, MappingConditions> condition)
         {
-            var sourceValue =
+            var sourceProp =
                 source
                 .GetType()
                 .GetProperty(condition.Value.SourcePropertyName)
                 .GetValue(source);
-
-            targetType
-                .GetProperty(condition.Key)
-                .SetValue(target, sourceValue);// target.property = sourceValue
+            if (sourceProp != null)
+            {
+                var sourceValue = sourceProp.GetType().GetProperty(condition.Value.SourcePropertyName).GetValue(sourceProp);
+                SetPropertyValue(targetType, target, condition.Key, sourceValue);
+            }
         }
 
         private static void ConditionIsValue<TTarget>(
@@ -167,17 +145,7 @@ namespace 自製AutoMapper
             TTarget target,
             KeyValuePair<string, MappingConditions> condition)
         {
-            var targetProp = targetType.GetProperty(condition.Key);
-
-            if (targetProp.PropertyType == condition.Value.TargetData.GetType())
-            {
-                targetProp.SetValue(target, condition.Value.TargetData);
-                return;
-            }
-
-            var convertResult = Convert.ChangeType(condition.Value.TargetData, targetProp.PropertyType);
-            // 兩邊不同型別時，需轉型
-            targetProp.SetValue(target, convertResult);
+            SetPropertyValue(targetType, target, condition.Key, condition.Value.TargetData);
         }
 
         private static void ConditionIsCombination<TTarget>(
@@ -185,14 +153,25 @@ namespace 自製AutoMapper
             TTarget target,
             KeyValuePair<string, MappingConditions> condition)
         {
-            targetType
-                .GetProperty(condition.Key)
-                .SetValue(target, condition.Value.TargetData);
+            SetPropertyValue(targetType, target, condition.Key, condition.Value.TargetData);
         }
 
-        private static object Map(object source)
+        private static void SetPropertyValue<TTarget>(Type targetType, TTarget target, string propertyName, object value)
         {
-            return null;
+            var prop = targetType.GetProperty(propertyName);
+            if (prop != null)
+            {
+                try
+                {
+                    var convertedValue = Convert.ChangeType(value, prop.PropertyType);
+                    prop.SetValue(target, convertedValue);
+                }
+                catch (Exception)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot map source filed '{propertyName}' to target field '{prop.Name}'.");
+                }
+            }
         }
     }
 }

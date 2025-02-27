@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
 namespace 自製AutoMapper
 {
@@ -48,8 +43,6 @@ namespace 自製AutoMapper
                 };
 
             Student student = Mapper.Map<User, Student>(user);
-
-            //Test<User, Student>(x => x.Email, y => y.StuEmail);
         }
 
         private static string Add(string str1, string str2)

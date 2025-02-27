@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using 自製AutoMapper.mappers;
 
 namespace AutoMapper.Mappers
@@ -28,7 +24,6 @@ namespace AutoMapper.Mappers
             }
             else if (targetProp.PropertyType == typeof(int))
             {
-                //var enumToInt = Convert.ToInt32(prop.GetValue(sourceData));
                 var enumToInt = (int)(sourceValue);
                 targetProp.SetValue(target, enumToInt);
             }

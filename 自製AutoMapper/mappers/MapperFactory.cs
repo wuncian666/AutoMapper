@@ -1,9 +1,4 @@
 ﻿using AutoMapper.Mappers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using 自製AutoMapper.Enums;
 
 namespace 自製AutoMapper.mappers
